@@ -1,0 +1,428 @@
+<!-- gestion/templates/gestion/supplier_order_add_items.html -->
+{% extends 'gestion/base.html' %}
+<!-- -->
+{% block title %}Agregar Items - Orden #{{ order.id }}{% endblock %}
+<!-- -->
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2>Orden #{{ order.id }} - {{ order.supplier.name }}</h2>
+      <a href="{% url 'supplier_order_detail' order.pk %}" class="btn btn-secondary">
+        Ver Detalle
+      </a>
+    </div>
+
+    <!-- Información de la Orden -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6">
+            <p><strong>Proveedor:</strong> {{ order.supplier.name }}</p>
+            <p><strong>Bodega:</strong> {{ order.warehouse.name }}</p>
+            <p><strong>Zona:</strong> {{ order.zone.name }}</p>
+          </div>
+          <div class="col-md-6">
+            <p><strong>Estado:</strong> 
+              {% if order.status == 'PENDING' %}
+                <span class="badge bg-warning">Pendiente</span>
+              {% elif order.status == 'RECEIVED' %}
+                <span class="badge bg-success">Recibida</span>
+              {% endif %}
+            </p>
+            <p><strong>Fecha:</strong> {{ order.order_date|date:"d/m/Y H:i" }}</p>
+            <p><strong>Items en orden:</strong> <span id="total-items-count">{{ items|length }}</span></p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Búsqueda de Productos -->
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-12">
+            <input
+              type="text"
+              id="product-search-input"
+              class="form-control"
+              placeholder="Buscar productos por nombre o SKU..."
+              value="{{ search_query }}"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nota Informativa -->
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-info-circle"></i> <strong>Nota:</strong> Puedes agregar productos incluso si tienen stock 0. 
+      Al recibir la orden, el inventario se actualizará y los productos volverán a aparecer automáticamente en la lista de inventario.
+    </div>
+
+    <!-- Catálogo de Productos -->
+    <div class="card mb-3">
+      <div class="card-header">
+        <h5 class="mb-0">Catálogo de Productos</h5>
+      </div>
+      <div class="card-body">
+        <div id="products-catalog" class="row">
+          {% for product in products %}
+          <div class="col-md-4 mb-3 product-card" data-product-id="{{ product.id }}" data-product-name="{{ product.name|lower }}" data-product-sku="{{ product.sku|lower }}">
+            <div class="card h-100">
+              <div class="card-body">
+                <h6 class="card-title">{{ product.name }}</h6>
+                <p class="card-text text-muted small mb-2">
+                  <strong>SKU:</strong> {{ product.sku }}<br>
+                  <strong>Precio:</strong> ${{ product.price|floatformat:2 }}
+                </p>
+                <div class="input-group input-group-sm">
+                  <input
+                    type="number"
+                    class="form-control product-quantity"
+                    min="1"
+                    value="1"
+                    data-product-id="{{ product.id }}"
+                    placeholder="Cantidad"
+                  />
+                  <button
+                    class="btn btn-primary btn-sm add-product-btn"
+                    data-product-id="{{ product.id }}"
+                    data-product-name="{{ product.name }}"
+                    data-product-price="{{ product.price }}"
+                  >
+                    Agregar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-12">
+            <p class="text-muted text-center">No hay productos disponibles para este proveedor.</p>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resumen de Items Agregados -->
+  <div class="col-lg-4">
+    <div class="card sticky-top" style="top: 20px;">
+      <div class="card-header">
+        <h5 class="mb-0">Productos en la Orden</h5>
+      </div>
+      <div class="card-body">
+        <div id="order-items-list">
+          <div class="table-responsive" style="max-height: 400px; overflow-y: auto; {% if not items %}display: none;{% endif %}">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Cant.</th>
+                  <th>Precio</th>
+                  <th>Total</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="items-table-body">
+                {% for item in items %}
+                <tr id="item-row-{{ item.id }}">
+                  <td class="small">{{ item.product.name }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>${{ item.unit_price|floatformat:2 }}</td>
+                  <td>${{ item.subtotal|floatformat:2 }}</td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-danger delete-item-btn"
+                      data-item-id="{{ item.id }}"
+                      data-item-name="{{ item.product.name }}"
+                      title="Eliminar"
+                    >
+                      ×
+                    </button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="mt-3 pt-3 border-top" id="summary-section" {% if not items %}style="display: none;"{% endif %}>
+            <p class="mb-2"><strong>Total Items:</strong> <span id="total-items">{{ items|length }}</span></p>
+            <p class="mb-2"><strong>Total Cantidad:</strong> <span id="total-quantity">{{ order.total_quantity }}</span></p>
+          </div>
+          <div class="mt-3" id="receive-order-section" {% if not items %}style="display: none;"{% endif %}>
+            <a href="{% url 'supplier_order_receive' order.pk %}" class="btn btn-success w-100">
+              Recibir Orden
+            </a>
+          </div>
+          <p class="text-muted text-center" id="empty-message" {% if items %}style="display: none;"{% endif %}>No hay productos agregados.<br>Selecciona productos del catálogo.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const orderPk = {{ order.pk }};
+    const searchInput = document.getElementById('product-search-input');
+    const addProductBtns = document.querySelectorAll('.add-product-btn');
+    const productCards = document.querySelectorAll('.product-card');
+    const itemsTableBody = document.getElementById('items-table-body');
+    const totalItemsSpan = document.getElementById('total-items');
+    const totalItemsCountSpan = document.getElementById('total-items-count');
+    const totalQuantitySpan = document.getElementById('total-quantity');
+
+    // Función para obtener cookie CSRF
+    function getCookie(name) {
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+
+    // Búsqueda de productos
+    if (searchInput) {
+      let searchTimeout;
+      searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        const query = this.value.toLowerCase().trim();
+        
+        searchTimeout = setTimeout(() => {
+          productCards.forEach(card => {
+            const productName = card.dataset.productName;
+            const productSku = card.dataset.productSku;
+            
+            if (query === '' || productName.includes(query) || productSku.includes(query)) {
+              card.style.display = '';
+            } else {
+              card.style.display = 'none';
+            }
+          });
+        }, 300);
+      });
+    }
+
+    // Agregar producto a la orden
+    addProductBtns.forEach(btn => {
+      btn.addEventListener('click', async function() {
+        const productId = this.dataset.productId;
+        const productName = this.dataset.productName;
+        const quantityInput = this.closest('.card-body').querySelector('.product-quantity');
+        const quantity = parseInt(quantityInput.value) || 1;
+
+        if (quantity <= 0) {
+          Swal.fire('Error', 'La cantidad debe ser mayor a 0', 'error');
+          return;
+        }
+
+        try {
+          const response = await fetch(`/app/api/orders/${orderPk}/add-product/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+              product_id: productId,
+              quantity: quantity
+            })
+          });
+
+          const data = await response.json();
+
+          if (data.status === 'success') {
+            Swal.fire({
+              icon: 'success',
+              title: '¡Agregado!',
+              text: data.message,
+              timer: 1500,
+              showConfirmButton: false
+            });
+
+            // Actualizar la lista de items directamente con los datos recibidos
+            updateItemsTable(data.all_items);
+            updateCounters(data.total_items, data.total_quantity);
+
+            // Resetear cantidad
+            quantityInput.value = 1;
+          } else {
+            Swal.fire('Error', data.message, 'error');
+          }
+        } catch (error) {
+          console.error('Error:', error);
+          Swal.fire('Error', 'Error al agregar el producto', 'error');
+        }
+      });
+    });
+
+    // Recargar lista de items
+    async function reloadOrderItems() {
+      try {
+        const response = await fetch(`/app/api/orders/${orderPk}/items/`);
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+          updateItemsTable(data.items);
+          updateCounters(data.total_items, data.total_quantity);
+        }
+      } catch (error) {
+        console.error('Error recargando items:', error);
+        window.location.reload();
+      }
+    }
+
+    // Actualizar tabla de items
+    function updateItemsTable(items) {
+      if (!itemsTableBody) return;
+      
+      const emptyMessage = document.getElementById('empty-message');
+      const receiveOrderSection = document.getElementById('receive-order-section');
+      const orderItemsList = document.getElementById('order-items-list');
+      
+      if (items.length === 0) {
+        itemsTableBody.innerHTML = '';
+        const emptyRow = document.createElement('tr');
+        emptyRow.innerHTML = '<td colspan="5" class="text-center text-muted">No hay productos agregados</td>';
+        itemsTableBody.appendChild(emptyRow);
+        
+        // Mostrar mensaje vacío y ocultar botón
+        if (emptyMessage) emptyMessage.style.display = 'block';
+        if (receiveOrderSection) receiveOrderSection.style.display = 'none';
+        const summarySection = document.getElementById('summary-section');
+        if (summarySection) summarySection.style.display = 'none';
+        if (orderItemsList) {
+          const tableContainer = orderItemsList.querySelector('.table-responsive');
+          if (tableContainer) tableContainer.style.display = 'none';
+        }
+        return;
+      }
+      
+      // Ocultar mensaje vacío y mostrar botón
+      if (emptyMessage) emptyMessage.style.display = 'none';
+      if (receiveOrderSection) receiveOrderSection.style.display = 'block';
+      const summarySection = document.getElementById('summary-section');
+      if (summarySection) summarySection.style.display = 'block';
+      if (orderItemsList) {
+        const tableContainer = orderItemsList.querySelector('.table-responsive');
+        if (tableContainer) tableContainer.style.display = 'block';
+      }
+      
+      itemsTableBody.innerHTML = '';
+      items.forEach(item => {
+        const row = document.createElement('tr');
+        row.id = `item-row-${item.id}`;
+        row.innerHTML = `
+          <td class="small">${item.product_name}</td>
+          <td>${item.quantity}</td>
+          <td>$${parseFloat(item.unit_price).toFixed(2)}</td>
+          <td>$${parseFloat(item.subtotal).toFixed(2)}</td>
+          <td>
+            <button
+              class="btn btn-sm btn-danger delete-item-btn"
+              data-item-id="${item.id}"
+              data-item-name="${item.product_name}"
+              title="Eliminar"
+            >
+              ×
+            </button>
+          </td>
+        `;
+        itemsTableBody.appendChild(row);
+      });
+      
+      attachDeleteButtons();
+    }
+
+    // Actualizar contadores
+    function updateCounters(totalItems, totalQuantity) {
+      if (totalItemsSpan) totalItemsSpan.textContent = totalItems;
+      if (totalItemsCountSpan) totalItemsCountSpan.textContent = totalItems;
+      if (totalQuantitySpan) totalQuantitySpan.textContent = totalQuantity;
+    }
+
+    // Adjuntar botones de eliminar
+    function attachDeleteButtons() {
+      const deleteBtns = document.querySelectorAll('.delete-item-btn');
+      deleteBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+          const itemId = this.dataset.itemId;
+          const itemName = this.dataset.itemName;
+          const deleteUrl = `/app/supplier-orders/${orderPk}/item/${itemId}/delete/`;
+
+          Swal.fire({
+            title: '¿Estás seguro?',
+            text: `¿Desea eliminar "${itemName}" de la orden?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Sí, eliminar',
+            cancelButtonText: 'Cancelar'
+          }).then(async (result) => {
+            if (result.isConfirmed) {
+              try {
+                // Eliminar usando fetch
+                const response = await fetch(deleteUrl, {
+                  method: 'POST',
+                  headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                  }
+                });
+                
+                if (response.ok) {
+                  Swal.fire({
+                    icon: 'success',
+                    title: '¡Eliminado!',
+                    text: 'El producto ha sido eliminado de la orden',
+                    timer: 1500,
+                    showConfirmButton: false
+                  });
+                  
+                  // Recargar items
+                  await reloadOrderItems();
+                } else {
+                  // Si falla, recargar la página
+                  window.location.reload();
+                }
+              } catch (error) {
+                console.error('Error eliminando item:', error);
+                // Si hay error, recargar la página
+                window.location.reload();
+              }
+            }
+          });
+        });
+      });
+    }
+
+    // Inicializar botones de eliminar
+    attachDeleteButtons();
+
+    // Permitir agregar con Enter en el input de cantidad
+    document.querySelectorAll('.product-quantity').forEach(input => {
+      input.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          const addBtn = this.closest('.card-body').querySelector('.add-product-btn');
+          if (addBtn) {
+            addBtn.click();
+          }
+        }
+      });
+    });
+  });
+</script>
+{% endblock %}

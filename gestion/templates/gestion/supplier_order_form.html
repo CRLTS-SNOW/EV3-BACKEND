@@ -1,0 +1,116 @@
+<!-- gestion/templates/gestion/supplier_order_form.html -->
+{% extends 'gestion/base.html' %}
+<!-- -->
+{% block title %}{{ title }}{% endblock %}
+<!-- -->
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="text-center mb-4">{{ title }}</h2>
+
+        <form method="POST" id="orderForm">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label for="{{ form.supplier.id_for_label }}" class="form-label">Proveedor:</label>
+            {{ form.supplier }}
+            {% if form.supplier.errors %}
+              <div class="text-danger">{{ form.supplier.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.warehouse.id_for_label }}" class="form-label">{{ form.warehouse.label }}:</label>
+            {{ form.warehouse }}
+            {% if form.warehouse.errors %}
+              <div class="text-danger">{{ form.warehouse.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.zone.id_for_label }}" class="form-label">{{ form.zone.label }}:</label>
+            {{ form.zone }}
+            {% if form.zone.errors %}
+              <div class="text-danger">{{ form.zone.errors }}</div>
+            {% endif %}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.notes.id_for_label }}" class="form-label">Notas (Opcional):</label>
+            {{ form.notes }}
+            {% if form.notes.errors %}
+              <div class="text-danger">{{ form.notes.errors }}</div>
+            {% endif %}
+          </div>
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+          </div>
+          {% endif %}
+
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{% url 'supplier_order_list' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Continuar y Agregar Productos</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const warehouseSelect = document.getElementById('id_warehouse');
+    const zoneSelect = document.getElementById('id_zone');
+    
+    function loadZones(warehouseId) {
+      if (!warehouseId) {
+        zoneSelect.innerHTML = '<option value="">Seleccione una bodega primero</option>';
+        return;
+      }
+      
+      fetch(`/app/api/zones-by-warehouse/${warehouseId}/`)
+        .then(response => response.json())
+        .then(data => {
+          zoneSelect.innerHTML = '';
+          if (data.status === 'success' && data.zones.length > 0) {
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Seleccione una zona';
+            zoneSelect.appendChild(defaultOption);
+            
+            data.zones.forEach(zone => {
+              const option = document.createElement('option');
+              option.value = zone.id;
+              option.textContent = zone.name;
+              zoneSelect.appendChild(option);
+            });
+          } else {
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = 'No hay zonas disponibles';
+            zoneSelect.appendChild(option);
+          }
+        })
+        .catch(error => {
+          console.error('Error cargando zonas:', error);
+        });
+    }
+    
+    warehouseSelect.addEventListener('change', function() {
+      loadZones(this.value);
+    });
+    
+    // Cargar zonas si ya hay una bodega seleccionada
+    if (warehouseSelect.value) {
+      loadZones(warehouseSelect.value);
+    }
+  });
+</script>
+{% endblock %}
+

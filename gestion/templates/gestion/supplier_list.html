@@ -1,0 +1,360 @@
+{% extends 'gestion/base.html' %}
+{% block title %}Proveedores y Órdenes{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2>Proveedores y Órdenes</h2>
+  {% if user.is_superuser or user.profile.role == 'admin' %}
+  <div>
+    <a href="{% url 'export_suppliers_excel' %}" class="btn btn-success me-2">
+      Exportar Proveedores
+    </a>
+    <a href="{% url 'supplier_create' %}" class="btn btn-primary">
+      + Nuevo Proveedor
+    </a>
+  </div>
+  {% endif %}
+</div>
+
+<ul class="nav nav-tabs mb-3" id="mainTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="suppliers-tab" data-bs-toggle="tab" data-bs-target="#suppliers" type="button" role="tab">
+      Proveedores
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab">
+      Órdenes a Proveedores
+      </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="mainTabsContent">
+    <div class="tab-pane fade show active" id="suppliers" role="tabpanel">
+    {% if user.is_superuser or user.profile.role == 'admin' %}
+    <div class="card card-body mb-3">
+      <form method="GET" action="" class="row g-3 align-items-center">
+        <input type="hidden" name="tab" value="suppliers">
+        <div class="col-auto">
+          <input
+            type="text"
+            name="q"
+            id="supplier-live-search-input"
+            class="form-control"
+            value="{{ search_query }}"
+            placeholder="Buscar por nombre o email..."
+          />
+        </div>
+        <div class="col-auto">
+          <label for="sort-select" class="form-label mb-0">Ordenar por:</label>
+        </div>
+        <div class="col-auto">
+          <select id="sort-select" name="sort" class="form-select" onchange="this.form.submit()">
+            <option value="name" {% if current_sort == 'name' %}selected{% endif %}>Nombre (A-Z)</option>
+            <option value="-name" {% if current_sort == '-name' %}selected{% endif %}>Nombre (Z-A)</option>
+            <option value="email" {% if current_sort == 'email' %}selected{% endif %}>Email (A-Z)</option>
+            <option value="-email" {% if current_sort == '-email' %}selected{% endif %}>Email (Z-A)</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary" style="display: none;">Buscar</button>
+        </div>
+        {% if search_query %}
+        <div class="col-auto">
+          <a href="{% url 'supplier_list' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-striped table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Nombre</th>
+              <th>Email</th>
+              <th>Teléfono</th>
+              <th>Estado</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="supplier-list-body">
+            {% include 'gestion/includes/supplier_table_body.html' %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-4">
+      <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1&q={{ search_query }}&sort={{ current_sort }}&tab=suppliers">&laquo;</a>
+        </li>
+        <li class="page-item">
+          <a
+            class="page-link"
+            href="?page={{ page_obj.previous_page_number }}&q={{ search_query }}&sort={{ current_sort }}&tab=suppliers"
+            >Anterior</a
+          >
+        </li>
+        {% endif %}
+        <li class="page-item active" aria-current="page">
+          <span class="page-link">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a
+            class="page-link"
+            href="?page={{ page_obj.next_page_number }}&q={{ search_query }}&sort={{ current_sort }}&tab=suppliers"
+            >Siguiente</a
+          >
+        </li>
+        <li class="page-item">
+          <a
+            class="page-link"
+            href="?page={{ page_obj.paginator.num_pages }}&q={{ search_query }}&sort={{ current_sort }}&tab=suppliers"
+            >&raquo;</a
+          >
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+    {% else %}
+    <div class="alert alert-warning">
+      No tienes permisos para ver proveedores. Solo puedes ver órdenes.
+    </div>
+    {% endif %}
+  </div>
+
+    <div class="tab-pane fade" id="orders" role="tabpanel">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4>Órdenes a Proveedores</h4>
+      {% if user.is_superuser or user.profile.role == 'admin' or user.profile.role == 'bodega' %}
+      <div>
+        <a href="{% url 'export_supplier_orders_excel' %}" class="btn btn-success me-2">
+          Exportar Órdenes
+        </a>
+        <a href="{% url 'supplier_order_create' %}" class="btn btn-primary">
+          + Nueva Orden
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card card-body mb-3">
+      <form method="GET" action="" class="row g-3 align-items-center">
+        <input type="hidden" name="tab" value="orders">
+        <div class="col-auto">
+          <input
+            type="text"
+            name="order_q"
+            id="order-live-search-input"
+            class="form-control"
+            value="{{ order_search }}"
+            placeholder="Buscar por proveedor o ID..."
+          />
+        </div>
+        <div class="col-auto">
+          <select name="order_status" id="order-status-filter" class="form-select">
+            <option value="">Todos los estados</option>
+            <option value="PENDING" {% if order_status == 'PENDING' %}selected{% endif %}>Pendiente</option>
+            <option value="RECEIVED" {% if order_status == 'RECEIVED' %}selected{% endif %}>Recibida</option>
+            <option value="CANCELLED" {% if order_status == 'CANCELLED' %}selected{% endif %}>Cancelada</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary" style="display: none;">Buscar</button>
+        </div>
+        {% if order_search or order_status %}
+        <div class="col-auto">
+          <a href="{% url 'supplier_list' %}" class="btn btn-secondary">Limpiar</a>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <div class="table-responsive">
+          <table class="table table-striped table-hover mb-0">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Proveedor</th>
+                <th>Bodega</th>
+                <th>Zona</th>
+                <th>Items</th>
+                <th>Fecha</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="order-list-body">
+              {% include 'gestion/includes/supplier_order_table_body.html' %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// CORRECCIÓN: Se eliminó "d"
+document.addEventListener('DOMContentLoaded', function() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const tab = urlParams.get('tab');
+  
+  if (tab === 'orders') {
+    const ordersTab = document.getElementById('orders-tab');
+    const suppliersTab = document.getElementById('suppliers-tab');
+    const ordersPane = document.getElementById('orders');
+    const suppliersPane = document.getElementById('suppliers');
+    
+    if (ordersTab && suppliersTab) {
+      suppliersTab.classList.remove('active');
+      // CORRECCIÓN: Se eliminó "img"
+      ordersTab.classList.add('active');
+      suppliersPane.classList.remove('show', 'active');
+      ordersPane.classList.add('show', 'active');
+    }
+  }
+
+  // ----------------------------------------------------
+  // ¡NUEVO SCRIPT DE LIVE SEARCH PARA PROVEEDORES!
+  // ----------------------------------------------------
+  
+  // 1. Referencias a los elementos del buscador de Proveedores
+  const supplierSearchInput = document.getElementById('supplier-live-search-input');
+  const supplierResultsBody = document.getElementById('supplier-list-body');
+  
+  // Solo ejecutamos el resto si el input existe (evita errores si el usuario no tiene permisos)
+  if (supplierSearchInput) {
+    const supplierSearchURL = "{% url 'api_search_suppliers_live' %}";
+    const supplierSearchForm = supplierSearchInput.closest('form');
+
+    // 2. Prevenimos que "Enter" recargue la página
+    if (supplierSearchForm) {
+      supplierSearchForm.addEventListener('submit', (e) => {
+        e.preventDefault(); // Detiene el envío
+      });
+    }
+    
+    // 3. Función para actualizar la tabla de proveedores
+    const performSupplierSearch = async (query) => {
+      try {
+        const url = `${supplierSearchURL}?q=${encodeURIComponent(query)}`;
+        
+        const response = await fetch(url);
+        
+        if (response.headers.get('content-type') === 'application/json') {
+          const data = await response.json();
+          if (response.ok) {
+            supplierResultsBody.innerHTML = data.html;
+          } else {
+            console.error("Error en la búsqueda:", data);
+            supplierResultsBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error al cargar resultados.</td></tr>';
+          }
+        } else {
+          console.error("Respuesta no fue JSON. Código:", response.status);
+          // CORRECCIÓN: 'colspan-="5"' a 'colspan="5"'
+          supplierResultsBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error de comunicación.</td></tr>';
+          // CORRECCIÓN: Se eliminó "f"
+        }
+      } catch (error) {
+        console.error("Error de red:", error);
+        supplierResultsBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Error de conexión.</td></tr>';
+        // CORRECCIÓN: Se eliminó "section"
+      }
+    };
+
+    // 4. Lógica de 'keyup' (mientras se escribe)
+    let supplierDebounceTimer;
+
+    supplierSearchInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') return; 
+
+      clearTimeout(supplierDebounceTimer);
+      // CORRECCIÓN: Se eliminó "t"
+      const query = e.target.value.trim();
+      
+      supplierDebounceTimer = setTimeout(() => {
+        if (query.length >= 1 || query.length === 0) {
+          performSupplierSearch(query);
+          // CORRECCIÓN: Se eliminó "g"
+        }
+      }, 300); // 300ms de retraso
+      // CORRECCIÓN: Se eliminó "s"
+    });
+  }
+
+  // ----------------------------------------------------
+  // SCRIPT DE LIVE SEARCH PARA ÓRDENES
+  // ----------------------------------------------------
+  const orderSearchInput = document.getElementById('order-live-search-input');
+  const orderStatusFilter = document.getElementById('order-status-filter');
+  const orderResultsBody = document.getElementById('order-list-body');
+  
+  if (orderSearchInput && orderResultsBody) {
+    const orderSearchURL = "{% url 'api_search_supplier_orders_live' %}";
+    const orderSearchForm = orderSearchInput.closest('form');
+
+    if (orderSearchForm) {
+      orderSearchForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+      });
+    }
+    
+    const performOrderSearch = async (query, status) => {
+      try {
+        const url = `${orderSearchURL}?q=${encodeURIComponent(query)}&status=${encodeURIComponent(status || '')}`;
+        const response = await fetch(url);
+        
+        if (response.headers.get('content-type') === 'application/json') {
+          const data = await response.json();
+          if (response.ok) {
+            orderResultsBody.innerHTML = data.html;
+          } else {
+            console.error("Error en la búsqueda:", data);
+            orderResultsBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error al cargar resultados.</td></tr>';
+          }
+        } else {
+          console.error("La respuesta del servidor no fue JSON. Código:", response.status);
+          orderResultsBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error de comunicación con el servidor.</td></tr>';
+        }
+      } catch (error) {
+        console.error("Error de red o procesamiento:", error);
+        orderResultsBody.innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error de conexión.</td></tr>';
+      }
+    };
+
+    let orderDebounceTimer;
+    orderSearchInput.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') return;
+      clearTimeout(orderDebounceTimer);
+      const query = e.target.value.trim();
+      const status = orderStatusFilter ? orderStatusFilter.value : '';
+      orderDebounceTimer = setTimeout(() => {
+        if (query.length >= 1 || query.length === 0) {
+          performOrderSearch(query, status);
+        }
+      }, 300);
+    });
+
+    if (orderStatusFilter) {
+      orderStatusFilter.addEventListener('change', () => {
+        const query = orderSearchInput.value.trim();
+        const status = orderStatusFilter.value;
+        performOrderSearch(query, status);
+      });
+    }
+  }
+});
+</script>
+{% endblock %}

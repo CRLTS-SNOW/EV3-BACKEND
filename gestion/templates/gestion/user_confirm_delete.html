@@ -1,0 +1,73 @@
+<!-- gestion/templates/gestion/user_confirm_delete.html -->
+{% extends 'gestion/base.html' %}
+<!-- -->
+{% block title %}Eliminar Usuario - {{ user.username }}{% endblock %}
+<!-- -->
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-6">
+    <div class="card shadow-sm border-danger">
+      <div class="card-header bg-danger text-white">
+        <h5 class="mb-0">Confirmar Eliminación</h5>
+      </div>
+      <div class="card-body">
+        <p class="lead">¿Está seguro que desea eliminar al usuario <strong>{{ user.username }}</strong>?</p>
+        
+        <div class="alert alert-warning">
+          <strong>Advertencia:</strong> Esta acción no se puede deshacer. Todos los datos relacionados con este usuario serán eliminados permanentemente.
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-body">
+            <h6>Información del Usuario:</h6>
+            <p class="mb-1"><strong>Usuario:</strong> {{ user.username }}</p>
+            <p class="mb-1"><strong>Email:</strong> {{ user.email|default:"-" }}</p>
+            {% if user.profile %}
+            <p class="mb-0"><strong>Rol:</strong> {{ user.profile.get_role_display }}</p>
+            {% endif %}
+          </div>
+        </div>
+
+        <form method="POST" id="delete-user-form">
+          {% csrf_token %}
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{% url 'user_list' %}" class="btn btn-secondary">Cancelar</a>
+            <button type="submit" class="btn btn-danger" id="confirm-delete-btn">Eliminar Usuario</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const deleteForm = document.getElementById('delete-user-form');
+    const confirmBtn = document.getElementById('confirm-delete-btn');
+
+    if (deleteForm && confirmBtn) {
+      deleteForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        Swal.fire({
+          title: '¿Estás completamente seguro?',
+          html: '<p>Está a punto de eliminar al usuario <strong>{{ user.username }}</strong>.</p><p class="text-danger"><strong>Esta acción no se puede deshacer.</strong></p>',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'Sí, eliminar permanentemente',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          dangerMode: true
+        }).then((result) => {
+          if (result.isConfirmed) {
+            deleteForm.submit();
+          }
+        });
+      });
+    }
+  });
+</script>
+{% endblock %}
+

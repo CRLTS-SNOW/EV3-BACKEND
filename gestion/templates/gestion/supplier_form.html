@@ -1,0 +1,60 @@
+{% extends 'gestion/base.html' %} {# Este comentario fuerza el salto de línea
+para el formateador #} {% block title %}{{ title }}{% endblock %} {# Este
+comentario fuerza el salto de línea para el formateador #} {% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="text-center mb-4">{{ title }}</h2>
+
+        <form method="POST">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label for="{{ form.name.id_for_label }}" class="form-label"
+              >Nombre:</label
+            >
+            {{ form.name }}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.email.id_for_label }}" class="form-label"
+              >Email:</label
+            >
+            {{ form.email }}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.phone.id_for_label }}" class="form-label"
+              >Teléfono:</label
+            >
+            {{ form.phone }}
+          </div>
+
+          <div class="form-check mb-3">
+            {{ form.is_active }}
+            <label
+              for="{{ form.is_active.id_for_label }}"
+              class="form-check-label"
+              >Está activo</label
+            >
+          </div>
+
+          {% if form.errors %}
+          <div class="alert alert-danger">Por favor corrige los errores.</div>
+          {% endif %}
+
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="{% url 'supplier_list' %}" class="btn btn-secondary"
+              >Cancelar</a
+            >
+            <button type="submit" class="btn btn-primary">
+              Guardar Cambios
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

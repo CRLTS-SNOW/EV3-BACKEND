@@ -1,0 +1,210 @@
+{% extends 'gestion/base.html' %}
+<!--  -->
+{% block title %}Realizar Transferencia{% endblock %}
+<!--  -->
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <form id="movementForm">
+          <h2 class="text-center mb-4">Transferir Stock entre Zonas</h2>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label for="{{ form.product.id_for_label }}" class="form-label"
+              >Producto:</label
+            >
+            {{ form.product }}
+          </div>
+
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label
+                for="{{ form.origin_zone.id_for_label }}"
+                class="form-label"
+                >Zona de Origen (Salida):</label
+              >
+              {{ form.origin_zone }}
+              <div
+                class="form-text"
+                id="stock-display"
+                style="font-weight: bold; color: #007bff"
+              ></div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+              <label
+                for="{{ form.destination_zone.id_for_label }}"
+                class="form-label"
+                >Zona de Destino (Entrada):</label
+              >
+              {{ form.destination_zone }}
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.quantity.id_for_label }}" class="form-label"
+              >Cantidad a Mover:</label
+            >
+            {{ form.quantity }}
+          </div>
+
+          <div class="mb-3">
+            <label for="{{ form.reason.id_for_label }}" class="form-label"
+              >Motivo (Opcional):</label
+            >
+            {{ form.reason }}
+          </div>
+
+          <button type="submit" class="btn btn-primary w-100 btn-lg">
+            Realizar Transferencia
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %} {# Este comentario fuerza el salto de línea para el formateador
+#} {% block scripts %}
+
+<script>
+  // --- Referencias a los elementos del DOM ---
+  const productSelect = document.getElementById(
+    "{{ form.product.id_for_label }}"
+  );
+  const originZoneSelect = document.getElementById(
+    "{{ form.origin_zone.id_for_label }}"
+  );
+  const destZoneSelect = document.getElementById(
+    "{{ form.destination_zone.id_for_label }}"
+  );
+  const stockDisplay = document.getElementById("stock-display");
+  const form = document.getElementById("movementForm");
+
+  let productStockInfo = [];
+  let allZonesInfo = [];
+
+  // --- Función para resetear un dropdown ---
+  function resetSelect(selectElement, defaultText) {
+    selectElement.innerHTML = "";
+    const defaultOption = new Option(defaultText, "");
+    defaultOption.disabled = true;
+    defaultOption.selected = true;
+    selectElement.add(defaultOption);
+  }
+
+  // --- Lógica de Carga Inicial ---
+  document.addEventListener("DOMContentLoaded", async () => {
+    resetSelect(originZoneSelect, "Seleccione un producto primero");
+    resetSelect(destZoneSelect, "Seleccione un producto primero");
+
+    try {
+      const response = await fetch("{% url 'api_get_all_zones' %}");
+      const data = await response.json();
+      if (data.status === "success") {
+        allZonesInfo = data.zones;
+      }
+    } catch (error) {
+      console.error("Error cargando zonas:", error);
+    }
+  });
+
+  // --- 1. CUANDO EL USUARIO SELECCIONA UN PRODUCTO ---
+  productSelect.addEventListener("change", async () => {
+    const productId = productSelect.value;
+
+    resetSelect(originZoneSelect, "Cargando zonas...");
+    resetSelect(destZoneSelect, "Seleccione zona de origen");
+    stockDisplay.textContent = "";
+
+    if (!productId) {
+      resetSelect(originZoneSelect, "Seleccione un producto");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/app/api/product-stock/${productId}/`);
+      const data = await response.json();
+
+      if (data.status === "success" && data.stock_info.length > 0) {
+        productStockInfo = data.stock_info;
+
+        resetSelect(originZoneSelect, "Seleccione zona de origen");
+        data.stock_info.forEach((item) => {
+          originZoneSelect.add(new Option(item.zone_name, item.zone_id));
+        });
+      } else {
+        productStockInfo = [];
+        resetSelect(originZoneSelect, "Producto sin stock");
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      resetSelect(originZoneSelect, "Error al cargar zonas");
+    }
+  });
+
+  // --- 2. CUANDO EL USUARIO SELECCIONA ZONA DE ORIGEN ---
+  originZoneSelect.addEventListener("change", () => {
+    const selectedZoneId = originZoneSelect.value;
+
+    const stockInfo = productStockInfo.find(
+      (item) => item.zone_id == selectedZoneId
+    );
+    if (stockInfo) {
+      stockDisplay.textContent = `Stock disponible: ${stockInfo.stock}`;
+    } else {
+      stockDisplay.textContent = "";
+    }
+
+    resetSelect(destZoneSelect, "Seleccione zona de destino");
+    allZonesInfo.forEach((zone) => {
+      if (zone.id != selectedZoneId) {
+        destZoneSelect.add(new Option(zone.name, zone.id));
+      }
+    });
+  });
+
+  // --- 3. CUANDO SE ENVÍA EL FORMULARIO (AJAX) ---
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    const response = await fetch("{% url 'product_movement' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": data.csrfmiddlewaretoken,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      Swal.fire({
+        title: "¡Éxito!",
+        text: result.message,
+        icon: "success",
+      }).then(() => {
+        form.reset();
+        resetSelect(originZoneSelect, "Seleccione un producto primero");
+        resetSelect(destZoneSelect, "Seleccione un producto primero");
+        stockDisplay.textContent = "";
+      });
+    } else {
+      // --- INICIO DE LA CORRECCIÓN ---
+      // Ya no usamos split, mostramos todos los errores
+      // que nos envía la vista (que ya vienen en HTML).
+      Swal.fire({
+        title: "Error de Validación",
+        html: result.errors,
+        icon: "error",
+      });
+      // --- FIN DE LA CORRECCIÓN ---
+    }
+  });
+</script>
+{% endblock %}
