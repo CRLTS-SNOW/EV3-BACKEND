@@ -7,9 +7,10 @@ from .zone import Zone
 from .product import Product
 from .inventory import Inventory
 from .product_movement import ProductMovement
+from .product_supplier import ProductSupplier
 
 # --- Modelos nuevos ---
-from .user_profile import UserProfile # <-- Este archivo ahora SÍ existe
+from .user_profile import UserProfile
 from .client import Client
 from .sale import Sale
 from .sale_item import SaleItem
@@ -23,6 +24,7 @@ __all__ = [
     'Product',
     'Inventory',
     'ProductMovement',
+    'ProductSupplier',
     
     # --- Modelos nuevos ---
     'UserProfile',

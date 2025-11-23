@@ -35,7 +35,8 @@ class SupplierOrder(models.Model):
         verbose_name_plural = "Órdenes a Proveedores"
 
     def __str__(self):
-        return f"Orden #{self.id} - {self.supplier.name} - {self.get_status_display()}"
+        supplier_name = self.supplier.razon_social or self.supplier.nombre_fantasia or 'N/A'
+        return f"Orden #{self.id} - {supplier_name} - {self.get_status_display()}"
     
     @property
     def total_items(self):

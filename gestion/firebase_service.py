@@ -250,18 +250,40 @@ def sync_django_user_to_firebase(django_user, password=None, old_email=None):
         
         # 2. Si no se encuentra y hay email anterior, buscar por email anterior
         if not firebase_user and old_email_normalized and old_email_normalized != current_email:
+            if settings.DEBUG:
+                print(f"DEBUG: Usuario no encontrado con email actual {current_email}, buscando con email anterior {old_email_normalized}")
             firebase_user = get_firebase_user_by_email(old_email_normalized)
         
         if firebase_user:
             # Usuario existe en Firebase, actualizar
+            firebase_email_normalized = firebase_user.email.strip().lower() if firebase_user.email else None
+            
             update_data = {
                 'display_name': display_name,
                 'disabled': not django_user.is_active
             }
             
-            # Si el email cambió, actualizarlo
-            if current_email and firebase_user.email and firebase_user.email.strip().lower() != current_email:
-                update_data['email'] = current_email
+            # Si el email cambió (comparar con email de Firebase o email anterior), actualizarlo
+            email_changed = False
+            if current_email:
+                # Verificar si el email cambió comparando con el email actual de Firebase
+                if firebase_email_normalized != current_email:
+                    email_changed = True
+                # También verificar si hay un email anterior diferente (caso cuando se encontró por old_email)
+                elif old_email_normalized and old_email_normalized != current_email:
+                    email_changed = True
+            
+            # Solo actualizar el email si realmente cambió
+            if email_changed:
+                # Verificar que el nuevo email no esté en uso por otro usuario
+                existing_user_with_new_email = get_firebase_user_by_email(current_email)
+                if existing_user_with_new_email and existing_user_with_new_email.uid != firebase_user.uid:
+                    # El email ya está en uso por otro usuario, no actualizar el email
+                    if settings.DEBUG:
+                        print(f"ADVERTENCIA: El email {current_email} ya está en uso por otro usuario (UID: {existing_user_with_new_email.uid}). No se actualizará el email.")
+                else:
+                    # El email está disponible o pertenece al mismo usuario, actualizarlo
+                    update_data['email'] = current_email
             
             # Si se proporciona contraseña, actualizarla
             if password:
@@ -274,7 +296,7 @@ def sync_django_user_to_firebase(django_user, password=None, old_email=None):
                 # Si el error es que el email ya está en uso, no actualizar el email
                 if 'EMAIL_EXISTS' in error_msg or 'email already exists' in error_msg.lower():
                     if settings.DEBUG:
-                        print(f"ADVERTENCIA: El email {current_email} ya está en uso. Actualizando solo otros campos.")
+                        print(f"ADVERTENCIA: El email {current_email} ya está en uso por otro usuario. Actualizando solo otros campos.")
                     # Actualizar solo los campos que no son el email
                     update_data_no_email = {
                         'display_name': display_name,
@@ -284,6 +306,8 @@ def sync_django_user_to_firebase(django_user, password=None, old_email=None):
                         update_data_no_email['password'] = password
                     return update_firebase_user(firebase_user.uid, **update_data_no_email)
                 else:
+                    if settings.DEBUG:
+                        print(f"ERROR al actualizar usuario en Firebase: {error_msg}")
                     raise
         else:
             # Usuario no existe en Firebase, crear nuevo
@@ -430,3 +454,174 @@ def verify_firebase_password(email, password):
             'error': error_msg
         }
 
+
+def send_password_reset_email(email):
+    """
+    Envía un email de restablecimiento de contraseña usando Firebase Authentication.
+    
+    Args:
+        email: Email del usuario
+    
+    Returns:
+        dict: Diccionario con 'success' (bool) y 'message' (str) o 'error' (str)
+    """
+    try:
+        initialize_firebase()
+        
+        if not _firebase_initialized:
+            return {'success': False, 'error': 'Firebase no está inicializado'}
+        
+        # Normalizar el email
+        email = email.strip().lower() if email else None
+        
+        if not email:
+            return {'success': False, 'error': 'Email no válido'}
+        
+        # Verificar que el usuario existe en Firebase
+        firebase_user = get_firebase_user_by_email(email)
+        if not firebase_user:
+            # No revelar que el usuario no existe por seguridad
+            # Firebase también hace esto, pero lo hacemos explícito
+            return {'success': True, 'message': 'Si el email existe, se enviará un enlace de restablecimiento'}
+        
+        # Generar código de restablecimiento de contraseña usando la API REST de Firebase
+        api_key = config('FIREBASE_WEB_API_KEY', default='AIzaSyBBaZY2-tp24fMt3uc13gLRpu9KnGOFA9g')
+        
+        # Obtener la URL del frontend para redirección después de cambiar contraseña
+        frontend_url = config('FRONTEND_URL', default='http://localhost:3000')
+        continue_url = f"{frontend_url}/reset-password-confirm"
+        
+        url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key={api_key}"
+        
+        payload = {
+            "requestType": "PASSWORD_RESET",
+            "email": email,
+            "continueUrl": continue_url
+        }
+        
+        if settings.DEBUG:
+            print(f"DEBUG: Enviando solicitud de restablecimiento de contraseña para {email}")
+            print(f"DEBUG: URL: {url}")
+            print(f"DEBUG: Payload: {payload}")
+        
+        response = requests.post(url, json=payload, timeout=10)
+        
+        if settings.DEBUG:
+            print(f"DEBUG: Respuesta de Firebase: Status {response.status_code}")
+            print(f"DEBUG: Respuesta: {response.text}")
+        
+        if response.status_code == 200:
+            if settings.DEBUG:
+                print(f"DEBUG: Email de restablecimiento enviado exitosamente a {email}")
+            return {
+                'success': True,
+                'message': 'Se ha enviado un enlace de restablecimiento de contraseña a tu correo electrónico'
+            }
+        else:
+            try:
+                error_data = response.json()
+                error_message = error_data.get('error', {}).get('message', 'Error desconocido')
+                error_code = error_data.get('error', {}).get('code', None)
+                
+                if settings.DEBUG:
+                    print(f"DEBUG: Error de Firebase: {error_code} - {error_message}")
+                
+                return {
+                    'success': False,
+                    'error': error_message
+                }
+            except:
+                error_msg = f'Error HTTP {response.status_code}: {response.text}'
+                if settings.DEBUG:
+                    print(f"DEBUG: {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+                
+    except Exception as e:
+        error_msg = f"Error inesperado: {str(e)}"
+        if settings.DEBUG:
+            print(f"ERROR: {error_msg}")
+        return {
+            'success': False,
+            'error': error_msg
+        }
+
+def verify_password_reset_code_and_change_password(oob_code, new_password):
+    """
+    Verifica el código de restablecimiento de contraseña y cambia la contraseña.
+    
+    Args:
+        oob_code: Código OOB recibido por email
+        new_password: Nueva contraseña
+    
+    Returns:
+        dict: Diccionario con 'success' (bool) y 'message' (str) o 'error' (str)
+    """
+    try:
+        initialize_firebase()
+        
+        if not _firebase_initialized:
+            return {'success': False, 'error': 'Firebase no está inicializado'}
+        
+        if not oob_code or not new_password:
+            return {'success': False, 'error': 'Código y contraseña son requeridos'}
+        
+        # Verificar y cambiar la contraseña usando la API REST de Firebase
+        api_key = config('FIREBASE_WEB_API_KEY', default='AIzaSyBBaZY2-tp24fMt3uc13gLRpu9KnGOFA9g')
+        
+        url = f"https://identitytoolkit.googleapis.com/v1/accounts:resetPassword?key={api_key}"
+        
+        payload = {
+            "oobCode": oob_code,
+            "newPassword": new_password
+        }
+        
+        if settings.DEBUG:
+            print(f"DEBUG: Verificando código y cambiando contraseña")
+            print(f"DEBUG: URL: {url}")
+        
+        response = requests.post(url, json=payload, timeout=10)
+        
+        if settings.DEBUG:
+            print(f"DEBUG: Respuesta de Firebase: Status {response.status_code}")
+            print(f"DEBUG: Respuesta: {response.text}")
+        
+        if response.status_code == 200:
+            if settings.DEBUG:
+                print(f"DEBUG: Contraseña cambiada exitosamente")
+            return {
+                'success': True,
+                'message': 'Contraseña cambiada exitosamente'
+            }
+        else:
+            try:
+                error_data = response.json()
+                error_message = error_data.get('error', {}).get('message', 'Error desconocido')
+                error_code = error_data.get('error', {}).get('code', None)
+                
+                if settings.DEBUG:
+                    print(f"DEBUG: Error de Firebase: {error_code} - {error_message}")
+                
+                return {
+                    'success': False,
+                    'error': error_message
+                }
+            except:
+                error_msg = f'Error HTTP {response.status_code}: {response.text}'
+                if settings.DEBUG:
+                    print(f"DEBUG: {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg
+                }
+                
+    except Exception as e:
+        error_msg = f"Error inesperado: {str(e)}"
+        if settings.DEBUG:
+            print(f"ERROR: {error_msg}")
+        return {
+            'success': False,
+            'error': error_msg
+        }

@@ -22,17 +22,11 @@ class UserCreateForm(forms.ModelForm):
         choices=UserProfile.ROLE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    warehouse = forms.ModelChoiceField(
-        queryset=Warehouse.objects.all(),
-        required=False,
-        label="Bodega Asignada",
-        help_text="Solo para Operador de Bodega",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
     phone = forms.CharField(
         label="Teléfono",
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: +1234567890'})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: +56912345678'}),
+        help_text="Formato chileno (ej: +56912345678 o 912345678)"
     )
     photo = forms.ImageField(
         label="Foto",
@@ -41,42 +35,112 @@ class UserCreateForm(forms.ModelForm):
         help_text="Tamaño recomendado: 200x200px. La imagen se redimensionará automáticamente."
     )
 
+    nombres = forms.CharField(
+        label="Nombres",
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'maxlength': '100'}),
+        max_length=100,
+        help_text="Nombres del usuario (requerido)"
+    )
+    apellidos = forms.CharField(
+        label="Apellidos",
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'maxlength': '100'}),
+        max_length=100,
+        help_text="Apellidos del usuario (requerido)"
+    )
+    estado = forms.ChoiceField(
+        label="Estado",
+        choices=UserProfile.STATUS_CHOICES,
+        initial='ACTIVO',
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    mfa_habilitado = forms.BooleanField(
+        label="MFA Habilitado",
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    area = forms.CharField(
+        label="Área/Unidad",
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        max_length=100
+    )
+    observaciones = forms.CharField(
+        label="Observaciones",
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        max_length=500
+    )
+
     class Meta:
         model = User
-        fields = ['username', 'email', 'first_name', 'last_name']
+        fields = ['username', 'email']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and self.instance.pk and hasattr(self.instance, 'profile'):
-            if self.instance.profile.phone:
-                self.fields['phone'].initial = self.instance.profile.phone
+            profile = self.instance.profile
+            if profile.phone:
+                self.fields['phone'].initial = profile.phone
+            if profile.nombres:
+                self.fields['nombres'].initial = profile.nombres
+            if profile.apellidos:
+                self.fields['apellidos'].initial = profile.apellidos
+            if profile.estado:
+                self.fields['estado'].initial = profile.estado
+            if profile.mfa_habilitado:
+                self.fields['mfa_habilitado'].initial = profile.mfa_habilitado
+            if profile.area:
+                self.fields['area'].initial = profile.area
+            if profile.observaciones:
+                self.fields['observaciones'].initial = profile.observaciones
 
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone')
+        if phone:
+            # Remover espacios y guiones
+            phone_clean = phone.replace(' ', '').replace('-', '')
+            # Validar formato internacional
+            import re
+            if not re.match(r'^\+?[1-9]\d{1,14}$', phone_clean):
+                raise forms.ValidationError("El teléfono no es válido. Use formato internacional (ej: +56912345678)")
+            return phone_clean
+        return phone
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if username:
+            if len(username) < 3:
+                raise forms.ValidationError("El usuario debe tener al menos 3 caracteres")
+            if len(username) > 150:
+                raise forms.ValidationError("El usuario no puede tener más de 150 caracteres")
+            import re
+            if not re.match(r'^[a-zA-Z0-9_]+$', username):
+                raise forms.ValidationError("El usuario solo puede contener letras, números y guiones bajos")
+        return username
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email:
+            if len(email) > 150:
+                raise forms.ValidationError("El email no puede tener más de 150 caracteres")
+        return email
+    
     def clean(self):
         cleaned_data = super().clean()
         password = cleaned_data.get('password')
         password_confirm = cleaned_data.get('password_confirm')
-        role = cleaned_data.get('role')
-        warehouse = cleaned_data.get('warehouse')
 
-        if password != password_confirm:
+        if password and password != password_confirm:
             raise forms.ValidationError("Las contraseñas no coinciden.")
         
-        if len(password) < 8:
+        if password and len(password) < 8:
             raise forms.ValidationError("La contraseña debe tener al menos 8 caracteres.")
-        
-        # Si es bodega, debe tener bodega asignada
-        if role == 'bodega' and not warehouse:
-            raise forms.ValidationError("Los Operadores de Bodega deben tener una bodega asignada.")
-        
-        # Si no es bodega, no debe tener bodega
-        if role != 'bodega' and warehouse:
-            cleaned_data['warehouse'] = None
 
         return cleaned_data
 
@@ -90,8 +154,12 @@ class UserCreateForm(forms.ModelForm):
             # Crear o actualizar el perfil
             profile, created = UserProfile.objects.get_or_create(user=user)
             profile.role = self.cleaned_data['role']
-            if self.cleaned_data.get('warehouse'):
-                profile.warehouse = self.cleaned_data['warehouse']
+            profile.nombres = self.cleaned_data.get('nombres', '')
+            profile.apellidos = self.cleaned_data.get('apellidos', '')
+            profile.estado = self.cleaned_data.get('estado', 'ACTIVO')
+            profile.mfa_habilitado = self.cleaned_data.get('mfa_habilitado', False)
+            profile.area = self.cleaned_data.get('area', '')
+            profile.observaciones = self.cleaned_data.get('observaciones', '')
             if self.cleaned_data.get('phone'):
                 profile.phone = self.cleaned_data['phone']
             if self.cleaned_data.get('photo'):
@@ -118,13 +186,6 @@ class UserUpdateForm(forms.ModelForm):
         choices=UserProfile.ROLE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    warehouse = forms.ModelChoiceField(
-        queryset=Warehouse.objects.all(),
-        required=False,
-        label="Bodega Asignada",
-        help_text="Solo para Operador de Bodega",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
     is_active = forms.BooleanField(
         required=False,
         label="Usuario Activo",
@@ -133,12 +194,50 @@ class UserUpdateForm(forms.ModelForm):
     phone = forms.CharField(
         label="Teléfono",
         required=False,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: +1234567890'})
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ej: +56912345678'}),
+        help_text="Formato chileno (ej: +56912345678 o 912345678)"
     )
     photo = forms.ImageField(
         label="Foto",
         required=False,
         widget=forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'})
+    )
+
+    nombres = forms.CharField(
+        label="Nombres",
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'maxlength': '100'}),
+        max_length=100,
+        help_text="Nombres del usuario (requerido)"
+    )
+    apellidos = forms.CharField(
+        label="Apellidos",
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'maxlength': '100'}),
+        max_length=100,
+        help_text="Apellidos del usuario (requerido)"
+    )
+    estado = forms.ChoiceField(
+        label="Estado",
+        choices=UserProfile.STATUS_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    mfa_habilitado = forms.BooleanField(
+        label="MFA Habilitado",
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+    area = forms.CharField(
+        label="Área/Unidad",
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+        max_length=100
+    )
+    observaciones = forms.CharField(
+        label="Observaciones",
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        max_length=500
     )
 
     class Meta:
@@ -147,55 +246,96 @@ class UserUpdateForm(forms.ModelForm):
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control', 'maxlength': '100'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control', 'maxlength': '100'}),
         }
+    
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if username:
+            if len(username) < 3:
+                raise forms.ValidationError("El usuario debe tener al menos 3 caracteres")
+            if len(username) > 150:
+                raise forms.ValidationError("El usuario no puede tener más de 150 caracteres")
+            import re
+            if not re.match(r'^[a-zA-Z0-9_]+$', username):
+                raise forms.ValidationError("El usuario solo puede contener letras, números y guiones bajos")
+        return username
+    
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email:
+            if len(email) > 150:
+                raise forms.ValidationError("El email no puede tener más de 150 caracteres")
+        return email
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if self.instance and hasattr(self.instance, 'profile'):
-            self.fields['role'].initial = self.instance.profile.role
-            if self.instance.profile.warehouse:
-                self.fields['warehouse'].initial = self.instance.profile.warehouse.id
-            if self.instance.profile.phone:
-                self.fields['phone'].initial = self.instance.profile.phone
+            profile = self.instance.profile
+            self.fields['role'].initial = profile.role
+            self.fields['estado'].initial = profile.estado
+            self.fields['mfa_habilitado'].initial = profile.mfa_habilitado
+            if profile.phone:
+                self.fields['phone'].initial = profile.phone
+            if profile.nombres:
+                self.fields['nombres'].initial = profile.nombres
+            if profile.apellidos:
+                self.fields['apellidos'].initial = profile.apellidos
+            if profile.area:
+                self.fields['area'].initial = profile.area
+            if profile.observaciones:
+                self.fields['observaciones'].initial = profile.observaciones
         else:
             # Si no tiene perfil, crear uno por defecto
             if self.instance.pk:
-                UserProfile.objects.get_or_create(user=self.instance, defaults={'role': 'ventas'})
+                UserProfile.objects.get_or_create(user=self.instance, defaults={'role': 'ventas', 'estado': 'ACTIVO'})
     
     def save(self, commit=True):
         user = super().save(commit=commit)
         if commit:
             # Actualizar perfil
             profile, created = UserProfile.objects.get_or_create(user=user)
-            profile.role = self.cleaned_data['role']
-            if self.cleaned_data.get('warehouse'):
-                profile.warehouse = self.cleaned_data['warehouse']
+            profile.role = self.cleaned_data.get('role', 'ventas')
+            profile.nombres = self.cleaned_data.get('nombres', '') or ''
+            profile.apellidos = self.cleaned_data.get('apellidos', '') or ''
+            profile.estado = self.cleaned_data.get('estado', 'ACTIVO') or 'ACTIVO'
+            profile.mfa_habilitado = self.cleaned_data.get('mfa_habilitado', False)
+            profile.area = self.cleaned_data.get('area', '') or ''
+            profile.observaciones = self.cleaned_data.get('observaciones', '') or ''
+            
+            # Manejar phone
+            phone = self.cleaned_data.get('phone')
+            if phone:
+                profile.phone = phone
             else:
-                profile.warehouse = None
-            if self.cleaned_data.get('phone'):
-                profile.phone = self.cleaned_data['phone']
-            if self.cleaned_data.get('photo'):
-                profile.photo = self.cleaned_data['photo']
+                profile.phone = None
+            
+            # Manejar photo
+            photo = self.cleaned_data.get('photo')
+            if photo:
+                profile.photo = photo
+            
             profile.save()
             # Nota: La sincronización con Firebase se hace en UserUpdateView.form_valid()
             # para tener mejor control y poder crear usuarios con contraseña por defecto
         return user
 
+    def clean_phone(self):
+        phone = self.cleaned_data.get('phone')
+        if phone:
+            # Remover espacios y guiones
+            phone_clean = phone.replace(' ', '').replace('-', '')
+            # Validar formato chileno: +56912345678, 56912345678, o 912345678
+            import re
+            # Debe empezar con +56, 56, o 9, seguido de 8 dígitos más (total 9 dígitos después del código de país)
+            if not re.match(r'^(\+?56)?9\d{8}$', phone_clean):
+                raise forms.ValidationError("El teléfono debe ser formato chileno (ej: +56912345678 o 912345678)")
+            return phone_clean
+        return phone
+    
     def clean(self):
         cleaned_data = super().clean()
-        role = cleaned_data.get('role')
-        warehouse = cleaned_data.get('warehouse')
-
-        # Si es bodega, debe tener bodega asignada
-        if role == 'bodega' and not warehouse:
-            raise forms.ValidationError("Los Operadores de Bodega deben tener una bodega asignada.")
-        
-        # Si no es bodega, no debe tener bodega
-        if role != 'bodega' and warehouse:
-            cleaned_data['warehouse'] = None
-
         return cleaned_data
 
 class UserPasswordChangeForm(forms.Form):

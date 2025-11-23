@@ -2,12 +2,15 @@
 
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.db import transaction
 from django.views.decorators.http import require_http_methods
 from decimal import Decimal
 import json
-from ..models import Inventory, Zone, Product, Sale, SaleItem, Client, SupplierOrder, SupplierOrderItem
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from ..models import Inventory, Zone, Product, Sale, SaleItem, Client, SupplierOrder, SupplierOrderItem, ProductSupplier
 
 @login_required
 def get_product_stock_info(request, product_id):
@@ -86,15 +89,16 @@ def get_sales_zone():
         return None
 
 # --- API: Buscar productos para venta ---
-@login_required
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def search_products_for_sale(request):
     """
     Busca productos por nombre o SKU y devuelve su precio y 
     el stock DISPONIBLE en la ZONA DE VENTAS.
     """
-    query = request.GET.get('q', '')
+    query = request.query_params.get('q', '') or request.query_params.get('query', '')
     if len(query) < 2: # No buscar con menos de 2 caracteres
-        return JsonResponse({'status': 'error', 'message': 'Query muy corto'}, status=400)
+        return Response({'status': 'success', 'products': []})
 
     try:
         # 1. Buscamos productos que coincidan
@@ -103,32 +107,102 @@ def search_products_for_sale(request):
             is_active=True
         )[:10] # Limitamos a 10 resultados
 
-        # 2. Obtenemos la zona de ventas
+        # 2. Obtenemos la zona de ventas (o usar stock total si no hay zona específica)
         sales_zone = get_sales_zone()
-        if not sales_zone:
-            return JsonResponse({'status': 'error', 'message': 'Zona de ventas no configurada'}, status=500)
-
+        
         results = []
         for product in products:
-            # 3. Buscamos el stock Específico de ese producto EN esa zona
-            try:
-                stock_item = Inventory.objects.get(product=product, zone=sales_zone)
-                available_stock = stock_item.quantity
-            except Inventory.DoesNotExist:
-                available_stock = 0 # No hay stock en la zona de ventas
+            # 3. Buscamos el stock disponible
+            if sales_zone:
+                # Si hay zona de ventas, buscar stock en esa zona
+                try:
+                    stock_item = Inventory.objects.get(product=product, zone=sales_zone)
+                    available_stock = stock_item.quantity
+                except Inventory.DoesNotExist:
+                    available_stock = 0
+            else:
+                # Si no hay zona de ventas configurada, usar stock total
+                total_stock = Inventory.objects.filter(product=product).aggregate(
+                    total=Sum('quantity')
+                )['total'] or 0
+                available_stock = int(total_stock)
+            
+            # IMPORTANTE: Solo mostrar productos con stock disponible
+            # (comentado para mostrar todos, pero el frontend puede filtrar)
 
+            # Convertir precio a número (float) para que funcione correctamente en el frontend
+            precio_venta = float(product.precio_venta or 0)
+            
             results.append({
                 'id': product.id,
                 'name': product.name,
                 'sku': product.sku,
-                'price': str(product.price),  # Convertir a string para JSON
-                'stock': available_stock # Stock solo de la zona de ventas
+                'price': precio_venta,  # Número, no string
+                'stock': available_stock
             })
         
-        return JsonResponse({'status': 'success', 'products': results})
+        return Response({'status': 'success', 'products': results})
 
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return Response({'status': 'error', 'message': str(e)}, status=500)
+
+# --- API: Obtener todos los productos disponibles para venta ---
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_all_products_for_sale(request):
+    """
+    Devuelve todos los productos activos con su precio y stock disponible
+    en la zona de ventas (o stock total si no hay zona específica).
+    """
+    try:
+        # Obtener parámetros de paginación
+        page = int(request.query_params.get('page', 1))
+        page_size = int(request.query_params.get('page_size', 50))
+        offset = (page - 1) * page_size
+        
+        # Obtener todos los productos activos
+        products = Product.objects.filter(is_active=True).order_by('name')[offset:offset + page_size]
+        total = Product.objects.filter(is_active=True).count()
+        
+        # Obtener la zona de ventas
+        sales_zone = get_sales_zone()
+        
+        results = []
+        for product in products:
+            # Buscar el stock disponible
+            if sales_zone:
+                try:
+                    stock_item = Inventory.objects.get(product=product, zone=sales_zone)
+                    available_stock = stock_item.quantity
+                except Inventory.DoesNotExist:
+                    available_stock = 0
+            else:
+                total_stock = Inventory.objects.filter(product=product).aggregate(
+                    total=Sum('quantity')
+                )['total'] or 0
+                available_stock = int(total_stock)
+            
+            precio_venta = float(product.precio_venta or 0)
+            
+            results.append({
+                'id': product.id,
+                'name': product.name,
+                'sku': product.sku,
+                'price': precio_venta,
+                'stock': available_stock
+            })
+        
+        return Response({
+            'status': 'success',
+            'products': results,
+            'count': total,
+            'page': page,
+            'page_size': page_size,
+            'total_pages': (total + page_size - 1) // page_size
+        })
+    
+    except Exception as e:
+        return Response({'status': 'error', 'message': str(e)}, status=500)
 
 # --- API: Procesar venta ---
 @login_required
@@ -192,12 +266,13 @@ def process_sale(request):
                 inventory = Inventory.objects.get(product=product, zone=sales_zone)
                 
                 # Crear el item de venta
-                item_price = product.price * Decimal(quantity)
+                sale_price = product.precio_venta or Decimal('0.00')
+                item_price = sale_price * Decimal(quantity)
                 SaleItem.objects.create(
                     sale=sale,
                     product=product,
                     quantity=quantity,
-                    price_at_sale=product.price
+                    price_at_sale=sale_price
                 )
                 
                 # Descontar stock
@@ -230,7 +305,7 @@ def get_product_price(request, product_id):
         product = Product.objects.get(id=product_id, is_active=True)
         return JsonResponse({
             'status': 'success',
-            'price': str(product.price),
+            'price': str(product.precio_venta or 0),
             'name': product.name
         })
     except Product.DoesNotExist:
@@ -264,9 +339,17 @@ def add_product_to_order(request, order_pk):
         
         product = Product.objects.get(pk=product_id, is_active=True)
         
-        # Verificar que el producto pertenece al proveedor de la orden
-        if product.supplier != order.supplier:
+        # Verificar que el producto pertenece al proveedor de la orden (a través de ProductSupplier)
+        product_supplier = ProductSupplier.objects.filter(
+            product=product,
+            supplier=order.supplier
+        ).first()
+        
+        if not product_supplier:
             return JsonResponse({'status': 'error', 'message': 'Este producto no pertenece al proveedor de la orden'}, status=400)
+        
+        # Obtener el precio del proveedor (costo) o usar precio_venta como fallback
+        unit_price = product_supplier.costo if product_supplier.costo else product.precio_venta
         
         # Verificar si el producto ya está en la orden
         existing_item = SupplierOrderItem.objects.filter(order=order, product=product).first()
@@ -274,6 +357,7 @@ def add_product_to_order(request, order_pk):
         if existing_item:
             # Si ya existe, actualizar la cantidad
             existing_item.quantity += quantity
+            existing_item.unit_price = unit_price  # Actualizar precio por si cambió
             existing_item.save()
             item = existing_item
             action = 'updated'
@@ -283,7 +367,7 @@ def add_product_to_order(request, order_pk):
                 order=order,
                 product=product,
                 quantity=quantity,
-                unit_price=product.price
+                unit_price=unit_price
             )
             action = 'created'
         

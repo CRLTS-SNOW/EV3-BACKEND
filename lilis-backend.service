@@ -1,0 +1,14 @@
+[Unit]
+Description=Lili's Backend Gunicorn daemon
+After=network.target
+
+[Service]
+User=ec2-user
+Group=ec2-user
+WorkingDirectory=/home/ec2-user/EV3-BACKEND
+Environment="PATH=/home/ec2-user/EV3-BACKEND/venv/bin"
+ExecStart=/home/ec2-user/EV3-BACKEND/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 config.wsgi:application
+
+[Install]
+WantedBy=multi-user.target
+

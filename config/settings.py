@@ -1,13 +1,16 @@
 import os
 from pathlib import Path
-from decouple import config
+from decouple import config, Csv
 from dj_database_url import parse as db_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config('SECRET_KEY')
+# Buscar .env en el directorio raíz del proyecto
+ENV_FILE = BASE_DIR / '.env'
 
-DEBUG = config('DEBUG', default=False, cast=bool)
+SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-this-in-production-key-12345')
+
+DEBUG = config('DEBUG', default=True, cast=bool)
 
 # Añadí tu host local aquí por seguridad
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', '98.95.67.251', 'ec2-98-95-67-251.compute-1.amazonaws.com']
@@ -22,6 +25,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     
+    # REST Framework
+    'rest_framework',
+    'corsheaders',
+    
     # Tu app
     'gestion',
 ]
@@ -35,7 +42,9 @@ except ImportError:
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS debe estar antes de CommonMiddleware
     'django.middleware.common.CommonMiddleware',
+    'gestion.middleware.DisableCSRFForAPI',  # Deshabilitar CSRF para APIs REST
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -114,3 +123,39 @@ LOGIN_REDIRECT_URL = 'product_list' # El 'name' de tu lista de productos
 
 # URL a la que Django redirige DESPUÉS de un logout
 LOGOUT_REDIRECT_URL = 'login' # Lo enviamos de vuelta al login
+
+# CORS Configuration para React
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://98.95.67.251",
+    "http://ec2-98-95-67-251.compute-1.amazonaws.com",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Trusted Origins
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://98.95.67.251",
+    "http://ec2-98-95-67-251.compute-1.amazonaws.com",
+]
+
+# REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'gestion.pagination.OptimizedPageNumberPagination',
+    'PAGE_SIZE': 20,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    # Optimizaciones de rendimiento
+    'DEFAULT_THROTTLE_CLASSES': [],
+    'DEFAULT_THROTTLE_RATES': {},
+}

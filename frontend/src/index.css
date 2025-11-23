@@ -1,0 +1,333 @@
+:root {
+  --lilis-red: #c00000;
+  --lilis-red-dark: #a00000;
+  --lilis-red-light: #e00000;
+  --lilis-gold: #d4af37;
+  --lilis-gold-dark: #b8941f;
+  --lilis-gold-light: #f4d03f;
+  --lilis-gold-gradient: linear-gradient(135deg, #d4af37 0%, #f4d03f 100%);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f8f9fa;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Colores principales de Lili's */
+.btn-primary {
+  background-color: var(--lilis-red);
+  border-color: var(--lilis-red);
+}
+
+.btn-primary:hover {
+  background-color: var(--lilis-red-dark);
+  border-color: var(--lilis-red-dark);
+}
+
+.btn-success {
+  background-color: var(--lilis-gold);
+  border-color: var(--lilis-gold);
+  color: #000;
+}
+
+.btn-success:hover {
+  background-color: var(--lilis-gold-dark);
+  border-color: var(--lilis-gold-dark);
+  color: #000;
+}
+
+/* Navbar con colores de Lili's */
+.navbar {
+  background-color: var(--lilis-red) !important;
+}
+
+.navbar-brand,
+.navbar-nav .nav-link {
+  color: var(--lilis-gold) !important;
+}
+
+.navbar-brand:hover,
+.navbar-nav .nav-link:hover {
+  color: var(--lilis-gold-light) !important;
+}
+
+.navbar-toggler {
+  border-color: var(--lilis-gold);
+}
+
+.navbar-toggler-icon {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(212, 175, 55, 1)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+}
+
+/* Enlaces en tablas */
+.table a {
+  color: var(--lilis-red);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.table a:hover {
+  color: var(--lilis-red-dark);
+}
+
+/* Paginación */
+.page-item.active .page-link {
+  background-color: var(--lilis-red);
+  border-color: var(--lilis-red);
+}
+
+.page-link {
+  color: var(--lilis-red);
+}
+
+.page-link:hover {
+  color: var(--lilis-red-dark);
+}
+
+/* Badges */
+.badge.bg-success {
+  background-color: var(--lilis-gold) !important;
+  color: #000;
+}
+
+.badge.bg-danger {
+  background-color: var(--lilis-red) !important;
+}
+
+/* Cards con borde dorado */
+.card {
+  border-top: 3px solid var(--lilis-gold);
+}
+
+.card-header {
+  background-color: var(--lilis-red);
+  color: var(--lilis-gold);
+  border-bottom: 2px solid var(--lilis-gold);
+}
+
+/* Formularios */
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--lilis-gold);
+  box-shadow: 0 0 0 0.25rem rgba(212, 175, 55, 0.25);
+}
+
+/* Títulos */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--lilis-red);
+}
+
+/* Links */
+a {
+  color: var(--lilis-red);
+}
+
+a:hover {
+  color: var(--lilis-red-dark);
+}
+
+/* Botones outline */
+.btn-outline-primary {
+  color: var(--lilis-red);
+  border-color: var(--lilis-red);
+}
+
+.btn-outline-primary:hover {
+  background-color: var(--lilis-red);
+  border-color: var(--lilis-red);
+  color: white;
+}
+
+.btn-outline-success {
+  color: var(--lilis-gold-dark);
+  border-color: var(--lilis-gold);
+}
+
+.btn-outline-success:hover {
+  background-color: var(--lilis-gold);
+  border-color: var(--lilis-gold);
+  color: #000;
+}
+
+/* Spinner */
+.spinner-border {
+  color: var(--lilis-red);
+}
+
+/* Alertas */
+.alert-primary {
+  background-color: rgba(192, 0, 0, 0.1);
+  border-color: var(--lilis-red);
+  color: var(--lilis-red-dark);
+}
+
+/* Dropdown */
+.dropdown-menu {
+  border-top: 2px solid var(--lilis-gold);
+}
+
+.dropdown-item:hover {
+  background-color: rgba(212, 175, 55, 0.1);
+  color: var(--lilis-red);
+}
+
+/* Login page styling */
+.login-container {
+  background: linear-gradient(135deg, rgba(192, 0, 0, 0.05) 0%, rgba(212, 175, 55, 0.05) 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.login-card {
+  border-top: 4px solid var(--lilis-gold);
+  box-shadow: 0 4px 6px rgba(192, 0, 0, 0.1);
+}
+
+.login-logo {
+  max-width: 150px;
+  margin-bottom: 20px;
+}
+
+/* Tablas con estilo Lili's */
+.table thead th {
+  background-color: var(--lilis-red);
+  color: var(--lilis-gold);
+  border-bottom: 2px solid var(--lilis-gold);
+}
+
+.table-hover tbody tr:hover {
+  background-color: rgba(212, 175, 55, 0.1);
+}
+
+/* Inputs con estilo Lili's */
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+input[type="tel"]:focus,
+input[type="url"]:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--lilis-gold);
+  box-shadow: 0 0 0 0.25rem rgba(212, 175, 55, 0.25);
+}
+
+/* Botones con estilo Lili's */
+.btn-danger {
+  background-color: var(--lilis-red);
+  border-color: var(--lilis-red);
+}
+
+.btn-danger:hover {
+  background-color: var(--lilis-red-dark);
+  border-color: var(--lilis-red-dark);
+}
+
+.btn-warning {
+  background-color: var(--lilis-gold);
+  border-color: var(--lilis-gold);
+  color: #000;
+}
+
+.btn-warning:hover {
+  background-color: var(--lilis-gold-dark);
+  border-color: var(--lilis-gold-dark);
+  color: #000;
+}
+
+/* Badges con estilo Lili's */
+.badge.bg-warning {
+  background-color: var(--lilis-gold) !important;
+  color: #000;
+}
+
+/* Spinner con colores Lili's */
+.spinner-border.text-primary {
+  color: var(--lilis-red) !important;
+}
+
+/* Links activos */
+.nav-link.active {
+  color: var(--lilis-gold-light) !important;
+  font-weight: bold;
+}
+
+/* Footer si existe */
+footer {
+  background-color: var(--lilis-red);
+  color: var(--lilis-gold);
+  border-top: 3px solid var(--lilis-gold);
+}
+
+/* Estilos para SweetAlert2 personalizados con colores de Lili's */
+.swal2-popup-custom {
+  border-radius: 10px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  border-top: 3px solid var(--lilis-gold);
+}
+
+.swal2-title-custom {
+  color: var(--lilis-red);
+  font-weight: 600;
+}
+
+.swal2-confirm-custom {
+  background-color: var(--lilis-red) !important;
+  border-color: var(--lilis-red) !important;
+  color: var(--lilis-gold) !important;
+  font-weight: 600;
+  padding: 10px 30px;
+  border-radius: 5px;
+  transition: all 0.3s ease;
+}
+
+.swal2-confirm-custom:hover {
+  background-color: var(--lilis-red-dark) !important;
+  border-color: var(--lilis-red-dark) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(192, 0, 0, 0.3);
+}
+
+.swal2-icon.swal2-warning {
+  border-color: var(--lilis-gold);
+  color: var(--lilis-gold);
+}
+
+.swal2-icon.swal2-error {
+  border-color: var(--lilis-red);
+  color: var(--lilis-red);
+}
+
+.swal2-icon.swal2-success {
+  border-color: var(--lilis-red);
+  color: var(--lilis-red);
+}
+
+.swal2-icon.swal2-success .swal2-success-ring {
+  border-color: var(--lilis-red);
+}
+
+.swal2-icon.swal2-success [class^=swal2-success-line] {
+  background-color: var(--lilis-red);
+}
+
